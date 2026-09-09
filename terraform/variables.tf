@@ -25,7 +25,7 @@ variable "public_subnet_cidr" {
 variable "instance_type" {
   description = "Tipo de instancia EC2"
   type        = string
-  default     = "t3.medium"
+  default     = "t3.small"
 }
 
 variable "my_ip" {
