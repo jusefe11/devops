@@ -27,3 +27,13 @@ output "application_url" {
   description = "URL publica de la aplicacion"
   value       = "http://${aws_instance.devops.public_ip}"
 }
+
+output "backend_ecr_url" {
+  description = "URL del repositorio ECR del backend"
+  value       = aws_ecr_repository.backend.repository_url
+}
+
+output "frontend_ecr_url" {
+  description = "URL del repositorio ECR del frontend"
+  value       = aws_ecr_repository.frontend.repository_url
+}
