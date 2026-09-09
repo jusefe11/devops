@@ -1,4 +1,4 @@
-name: Terraform AWS - Free Tier Check
+name: Terraform AWS Deploy
 
 on:
   workflow_dispatch:
@@ -8,9 +8,13 @@ permissions:
   contents: read
 
 jobs:
-  terraform-plan:
-    name: Consultar AWS y Terraform Plan
+  terraform-deploy:
+    name: Terraform Plan and Apply
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: terraform
 
     steps:
 
@@ -36,22 +40,11 @@ jobs:
       # ======================================================
       - name: Verificar identidad AWS
         run: aws sts get-caller-identity
+        working-directory: .
 
 
       # ======================================================
-      # 4. CONSULTAR INSTANCIAS FREE TIER X86_64
-      # ======================================================
-      - name: Consultar instancias Free Tier x86
-        run: |
-          aws ec2 describe-instance-types \
-            --region us-east-1 \
-            --filters Name=free-tier-eligible,Values=true \
-            --query "InstanceTypes[?ProcessorInfo.SupportedArchitectures[?@=='x86_64']].InstanceType" \
-            --output table
-
-
-      # ======================================================
-      # 5. INSTALAR TERRAFORM
+      # 4. INSTALAR TERRAFORM
       # ======================================================
       - name: Instalar Terraform
         uses: hashicorp/setup-terraform@v3
@@ -60,34 +53,44 @@ jobs:
 
 
       # ======================================================
-      # 6. TERRAFORM INIT
-      # Backend remoto S3
+      # 5. TERRAFORM INIT
       # ======================================================
       - name: Terraform Init
-        working-directory: terraform
         run: terraform init
 
 
       # ======================================================
-      # 7. TERRAFORM FORMAT
+      # 6. TERRAFORM FORMAT
       # ======================================================
       - name: Terraform Format
-        working-directory: terraform
         run: terraform fmt -check
 
 
       # ======================================================
-      # 8. TERRAFORM VALIDATE
+      # 7. TERRAFORM VALIDATE
       # ======================================================
       - name: Terraform Validate
-        working-directory: terraform
         run: terraform validate
 
 
       # ======================================================
-      # 9. TERRAFORM PLAN
-      # NO CREA NI MODIFICA RECURSOS
+      # 8. TERRAFORM PLAN
+      # Guarda el plan en tfplan
       # ======================================================
       - name: Terraform Plan
-        working-directory: terraform
-        run: terraform plan -input=false
+        run: terraform plan -input=false -out=tfplan
+
+
+      # ======================================================
+      # 9. TERRAFORM APPLY
+      # Aplica exactamente el plan anterior
+      # ======================================================
+      - name: Terraform Apply
+        run: terraform apply -input=false -auto-approve tfplan
+
+
+      # ======================================================
+      # 10. MOSTRAR OUTPUTS
+      # ======================================================
+      - name: Terraform Outputs
+        run: terraform output
