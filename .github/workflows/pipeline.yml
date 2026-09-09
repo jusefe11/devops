@@ -1,4 +1,4 @@
-name: Terraform + Docker + ECR
+name: Terraform + Docker + ECR + Kubernetes
 
 on:
   workflow_dispatch:
@@ -13,8 +13,10 @@ permissions:
 env:
   AWS_REGION: us-east-1
   AWS_ACCOUNT_ID: "014668143169"
+  EC2_INSTANCE_ID: "i-0f1cb40f3c198b321"
   BACKEND_REPOSITORY: hola-juan-devops-backend
   FRONTEND_REPOSITORY: hola-juan-devops-frontend
+
 
 jobs:
 
@@ -114,7 +116,7 @@ jobs:
     name: Docker Build and Push to ECR
     runs-on: ubuntu-latest
 
-    # Docker solo comienza si Terraform termino correctamente
+    # Solo inicia si Terraform termina correctamente
     needs: terraform-deploy
 
     steps:
@@ -137,7 +139,7 @@ jobs:
 
 
       # ======================================================
-      # 3. LOGIN EN AMAZON ECR
+      # 3. LOGIN AMAZON ECR
       # ======================================================
       - name: Login Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
@@ -159,8 +161,11 @@ jobs:
       # ======================================================
       - name: Docker Push Backend
         run: |
-          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPOSITORY:${{ github.sha }}
-          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPOSITORY:latest
+          docker push \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPOSITORY:${{ github.sha }}
+
+          docker push \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPOSITORY:latest
 
 
       # ======================================================
@@ -179,8 +184,11 @@ jobs:
       # ======================================================
       - name: Docker Push Frontend
         run: |
-          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_REPOSITORY:${{ github.sha }}
-          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_REPOSITORY:latest
+          docker push \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_REPOSITORY:${{ github.sha }}
+
+          docker push \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_REPOSITORY:latest
 
 
       # ======================================================
@@ -195,3 +203,78 @@ jobs:
           echo "FRONTEND"
           echo "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_REPOSITORY:${{ github.sha }}"
           echo "============================================"
+
+
+  # ==========================================================
+  # JOB 3 - DEPLOY AUTOMATICO A KUBERNETES
+  # ==========================================================
+  deploy-kubernetes:
+    name: Deploy Kubernetes
+    runs-on: ubuntu-latest
+
+    # Solo inicia si las imagenes llegaron correctamente a ECR
+    needs: docker-ecr
+
+    steps:
+
+      # ======================================================
+      # 1. DESCARGAR REPOSITORIO
+      # ======================================================
+      - name: Checkout
+        uses: actions/checkout@v4
+
+
+      # ======================================================
+      # 2. AUTENTICACION AWS MEDIANTE OIDC
+      # ======================================================
+      - name: Autenticarse en AWS
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: arn:aws:iam::014668143169:role/devops-juan
+          aws-region: ${{ env.AWS_REGION }}
+
+
+      # ======================================================
+      # 3. ENVIAR DESPLIEGUE A LA EC2 MEDIANTE SSM
+      # ======================================================
+      - name: Desplegar Backend y Frontend en Kubernetes
+        run: |
+
+          BACKEND_IMAGE="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPOSITORY:${{ github.sha }}"
+
+          FRONTEND_IMAGE="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_REPOSITORY:${{ github.sha }}"
+
+          echo "Backend:"
+          echo "$BACKEND_IMAGE"
+
+          echo "Frontend:"
+          echo "$FRONTEND_IMAGE"
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$EC2_INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy commit ${{ github.sha }} en Kubernetes" \
+            --parameters commands="[
+              \"sudo -u ubuntu -H bash -lc 'ECR_PASSWORD=\$(aws ecr get-login-password --region $AWS_REGION); minikube ssh -- sudo ctr -n k8s.io images pull --user AWS:\$ECR_PASSWORD $BACKEND_IMAGE'\",
+              \"sudo -u ubuntu -H bash -lc 'ECR_PASSWORD=\$(aws ecr get-login-password --region $AWS_REGION); minikube ssh -- sudo ctr -n k8s.io images pull --user AWS:\$ECR_PASSWORD $FRONTEND_IMAGE'\",
+              \"sudo -u ubuntu -H kubectl set image deployment/backend backend=$BACKEND_IMAGE -n hola-juan\",
+              \"sudo -u ubuntu -H kubectl set image deployment/frontend frontend=$FRONTEND_IMAGE -n hola-juan\",
+              \"sudo -u ubuntu -H kubectl rollout status deployment/backend -n hola-juan --timeout=120s\",
+              \"sudo -u ubuntu -H kubectl rollout status deployment/frontend -n hola-juan --timeout=120s\",
+              \"sudo -u ubuntu -H kubectl get pods -n hola-juan -o wide\"
+            ]" \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "============================================"
+          echo "SSM COMMAND ID:"
+          echo "$COMMAND_ID"
+          echo "============================================"
+
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$EC2_INSTANCE_ID"
+
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$EC2_INSTANCE_ID" 
