@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Hola Juan DevOps</title>
+</head>
+<body>
+
+    <h1>Hola Juan 🚀</h1>
+    <h2>Laboratorio DevOps</h2>
+
+    <p>Datos almacenados en PostgreSQL:</p>
+
+    <div id="personas"></div>
+
+    <script>
+        fetch('/api/personas')
+            .then(response => response.json())
+            .then(data => {
+                const contenedor = document.getElementById('personas');
+
+                data.forEach(persona => {
+                    contenedor.innerHTML +=
+                        `<p>${persona.nombre} - ${persona.profesion}</p>`;
+                });
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+    </script>
+
+</body>
+</html>
