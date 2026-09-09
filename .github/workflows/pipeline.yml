@@ -1,4 +1,4 @@
-name: Terraform AWS
+name: Terraform Bootstrap
 
 on:
   workflow_dispatch:
@@ -8,45 +8,37 @@ permissions:
   contents: read
 
 jobs:
-  terraform-plan:
-    name: Terraform Plan
+  bootstrap:
+    name: Crear Backend Terraform
     runs-on: ubuntu-latest
 
     defaults:
       run:
-        working-directory: terraform
+        working-directory: bootstrap
 
     steps:
-
-      # 1. Descargar codigo del repositorio
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Autenticacion GitHub -> AWS usando OIDC
       - name: Autenticarse en AWS
         uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: arn:aws:iam::014668143169:role/devops-juan
           aws-region: us-east-1
 
-      # 3. Instalar Terraform
       - name: Instalar Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.15.8
 
-      # 4. Inicializar Terraform
       - name: Terraform Init
         run: terraform init
 
-      # 5. Verificar formato
-      - name: Terraform Format
-        run: terraform fmt -check
-
-      # 6. Validar configuracion
       - name: Terraform Validate
         run: terraform validate
 
-      # 7. Crear plan
       - name: Terraform Plan
-        run: terraform plan -input=false
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
