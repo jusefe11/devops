@@ -45,6 +45,11 @@ resource "aws_instance" "devops" {
   # Llave SSH para conectarnos desde nuestro PC
   key_name = aws_key_pair.devops.key_name
 
+  # IAM Instance Profile
+  # Permite que la EC2 asuma el IAM Role configurado
+  # para acceder a Amazon ECR sin Access Keys
+  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
+
   # Configuracion de red
   subnet_id                   = aws_subnet.public.id
   vpc_security_group_ids      = [aws_security_group.ec2.id]
