@@ -1,0 +1,25 @@
+name: Prueba OIDC AWS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  probar-aws:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Autenticarse en AWS mediante OIDC
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: arn:aws:iam::014668143169:role/devops-juan
+          aws-region: us-east-1
+
+      - name: Verificar identidad AWS
+        run: aws sts get-caller-identity
