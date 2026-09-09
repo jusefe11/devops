@@ -1,4 +1,4 @@
-name: Terraform AWS
+name: Terraform AWS Deploy
 
 on:
   workflow_dispatch:
@@ -8,8 +8,8 @@ permissions:
   contents: read
 
 jobs:
-  terraform-plan:
-    name: Terraform Plan
+  terraform-deploy:
+    name: Terraform Plan and Apply
     runs-on: ubuntu-latest
 
     defaults:
@@ -34,18 +34,26 @@ jobs:
         with:
           terraform_version: 1.15.8
 
-      # 4. Inicializar Terraform y conectarse al backend S3
+      # 4. Inicializar Terraform y backend S3
       - name: Terraform Init
         run: terraform init
 
-      # 5. Revisar formato
+      # 5. Verificar formato
       - name: Terraform Format
         run: terraform fmt -check
 
-      # 6. Validar Terraform
+      # 6. Validar configuracion
       - name: Terraform Validate
         run: terraform validate
 
-      # 7. Generar plan
+      # 7. Crear el plan y guardarlo
       - name: Terraform Plan
-        run: terraform plan -input=false
+        run: terraform plan -input=false -out=tfplan
+
+      # 8. Aplicar exactamente el plan anterior
+      - name: Terraform Apply
+        run: terraform apply -input=false -auto-approve tfplan
+
+      # 9. Mostrar resultados
+      - name: Terraform Outputs
+        run: terraform output
