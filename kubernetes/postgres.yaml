@@ -20,6 +20,37 @@ stringData:
 ---
 
 # ============================================================
+# POSTGRESQL - SCRIPT DE INICIALIZACION
+# ============================================================
+
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: postgres-init
+  namespace: hola-juan
+
+data:
+  init.sql: |
+    CREATE TABLE IF NOT EXISTS personas (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(100) NOT NULL,
+        profesion VARCHAR(100) NOT NULL
+    );
+
+    INSERT INTO personas (nombre, profesion)
+    SELECT 'Juan', 'DevOps'
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM personas
+        WHERE nombre = 'Juan'
+          AND profesion = 'DevOps'
+    );
+
+
+---
+
+# ============================================================
 # POSTGRESQL - DEPLOYMENT
 # ============================================================
 
@@ -55,6 +86,10 @@ spec:
             - secretRef:
                 name: postgres-secret
 
+          volumeMounts:
+            - name: postgres-init
+              mountPath: /docker-entrypoint-initdb.d
+
           resources:
 
             requests:
@@ -64,6 +99,11 @@ spec:
             limits:
               memory: "256Mi"
               cpu: "300m"
+
+      volumes:
+        - name: postgres-init
+          configMap:
+            name: postgres-init
 
 
 ---
