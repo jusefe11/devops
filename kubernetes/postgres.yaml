@@ -51,6 +51,30 @@ data:
 ---
 
 # ============================================================
+# POSTGRESQL - PERSISTENT VOLUME CLAIM
+# ============================================================
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+
+metadata:
+  name: postgres-pvc
+  namespace: hola-juan
+
+spec:
+  accessModes:
+    - ReadWriteOnce
+
+  storageClassName: standard
+
+  resources:
+    requests:
+      storage: 1Gi
+
+
+---
+
+# ============================================================
 # POSTGRESQL - DEPLOYMENT
 # ============================================================
 
@@ -87,6 +111,9 @@ spec:
                 name: postgres-secret
 
           volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+
             - name: postgres-init
               mountPath: /docker-entrypoint-initdb.d
 
@@ -101,6 +128,11 @@ spec:
               cpu: "300m"
 
       volumes:
+
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+
         - name: postgres-init
           configMap:
             name: postgres-init
