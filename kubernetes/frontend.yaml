@@ -1,0 +1,98 @@
+# ============================================================
+# FRONTEND - DEPLOYMENT
+# ============================================================
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: frontend
+  namespace: hola-juan
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: frontend
+
+  template:
+
+    metadata:
+      labels:
+        app: frontend
+
+    spec:
+
+      containers:
+
+        - name: frontend
+
+          # Imagen inicial.
+          # GitHub Actions posteriormente cambia esta imagen
+          # por la imagen almacenada en Amazon ECR utilizando
+          # el SHA del commit.
+          image: hola-juan-frontend:v1
+
+          # El pipeline descarga previamente la imagen
+          # dentro del runtime containerd de Minikube.
+          imagePullPolicy: Never
+
+          ports:
+
+            - containerPort: 80
+
+          resources:
+
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+
+
+---
+
+# ============================================================
+# FRONTEND - SERVICE
+# ============================================================
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: frontend
+  namespace: hola-juan
+
+spec:
+
+  # ==========================================================
+  # NODEPORT
+  # ==========================================================
+  #
+  # Permite que Nginx instalado en la EC2 acceda al frontend
+  # de Kubernetes mediante:
+  #
+  # MINIKUBE_IP:30080
+  #
+  # ==========================================================
+
+  type: NodePort
+
+  selector:
+    app: frontend
+
+  ports:
+
+    - protocol: TCP
+
+      # Puerto del Service
+      port: 80
+
+      # Puerto del contenedor frontend
+      targetPort: 80
+
+      # Puerto fijo utilizado por Nginx de la EC2
+      nodePort: 30080

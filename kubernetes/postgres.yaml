@@ -1,0 +1,131 @@
+# ============================================================
+# POSTGRESQL - SECRET
+# ============================================================
+
+apiVersion: v1
+kind: Secret
+
+metadata:
+  name: postgres-secret
+  namespace: hola-juan
+
+type: Opaque
+
+stringData:
+  POSTGRES_USER: juan
+  POSTGRES_PASSWORD: juan123
+  POSTGRES_DB: holajuan
+
+
+---
+
+# ============================================================
+# POSTGRESQL - SCRIPT DE INICIALIZACION
+# ============================================================
+
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: postgres-init
+  namespace: hola-juan
+
+data:
+  init.sql: |
+    CREATE TABLE IF NOT EXISTS personas (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(100) NOT NULL,
+        profesion VARCHAR(100) NOT NULL
+    );
+
+    INSERT INTO personas (nombre, profesion)
+    SELECT 'Juan', 'DevOps'
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM personas
+        WHERE nombre = 'Juan'
+          AND profesion = 'DevOps'
+    );
+
+
+---
+
+# ============================================================
+# POSTGRESQL - DEPLOYMENT
+# ============================================================
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: postgres
+  namespace: hola-juan
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: postgres
+
+  template:
+    metadata:
+      labels:
+        app: postgres
+
+    spec:
+      containers:
+
+        - name: postgres
+          image: postgres:17-alpine
+
+          ports:
+            - containerPort: 5432
+
+          envFrom:
+            - secretRef:
+                name: postgres-secret
+
+          volumeMounts:
+            - name: postgres-init
+              mountPath: /docker-entrypoint-initdb.d
+
+          resources:
+
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+
+            limits:
+              memory: "256Mi"
+              cpu: "300m"
+
+      volumes:
+        - name: postgres-init
+          configMap:
+            name: postgres-init
+
+
+---
+
+# ============================================================
+# POSTGRESQL - SERVICE
+# ============================================================
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: postgres
+  namespace: hola-juan
+
+spec:
+  type: ClusterIP
+
+  selector:
+    app: postgres
+
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432

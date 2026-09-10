@@ -1,0 +1,13 @@
+# ============================================================
+# NAMESPACE - HOLA JUAN
+# ============================================================
+
+apiVersion: v1
+kind: Namespace
+
+metadata:
+  name: hola-juan
+
+  labels:
+    app: hola-juan
+    environment: lab
