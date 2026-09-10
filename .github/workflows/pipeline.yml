@@ -6,7 +6,7 @@ on:
       plan_only:
         description: "Ejecutar solamente Terraform Plan"
         required: true
-        default: false
+        default: true
         type: boolean
 
   push:
@@ -14,18 +14,18 @@ on:
       - main
       - feature/reproducibilidad
 
-
 permissions:
   id-token: write
   contents: read
 
-
 env:
   AWS_REGION: us-east-1
   AWS_ACCOUNT_ID: "014668143169"
-  EC2_INSTANCE_ID: "i-0f1cb40f3c198b321"
+
   BACKEND_REPOSITORY: hola-juan-devops-backend
   FRONTEND_REPOSITORY: hola-juan-devops-frontend
+
+  EC2_NAME: hola-juan-devops-ec2
 
 
 jobs:
@@ -44,17 +44,17 @@ jobs:
 
     steps:
 
-      # ======================================================
+      # ------------------------------------------------------
       # 1. CHECKOUT
-      # ======================================================
+      # ------------------------------------------------------
 
       - name: Checkout
         uses: actions/checkout@v4
 
 
-      # ======================================================
+      # ------------------------------------------------------
       # 2. AUTENTICACION AWS MEDIANTE OIDC
-      # ======================================================
+      # ------------------------------------------------------
 
       - name: Autenticarse en AWS
         uses: aws-actions/configure-aws-credentials@v5
@@ -63,18 +63,18 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
 
-      # ======================================================
+      # ------------------------------------------------------
       # 3. VERIFICAR IDENTIDAD AWS
-      # ======================================================
+      # ------------------------------------------------------
 
       - name: Verificar identidad AWS
         run: aws sts get-caller-identity
         working-directory: .
 
 
-      # ======================================================
+      # ------------------------------------------------------
       # 4. INSTALAR TERRAFORM
-      # ======================================================
+      # ------------------------------------------------------
 
       - name: Instalar Terraform
         uses: hashicorp/setup-terraform@v3
@@ -82,59 +82,54 @@ jobs:
           terraform_version: 1.15.8
 
 
-      # ======================================================
+      # ------------------------------------------------------
       # 5. TERRAFORM INIT
-      # ======================================================
+      # ------------------------------------------------------
 
       - name: Terraform Init
         run: terraform init
 
 
-      # ======================================================
+      # ------------------------------------------------------
       # 6. TERRAFORM FORMAT
-      # ======================================================
+      # ------------------------------------------------------
 
       - name: Terraform Format
         run: terraform fmt -check
 
 
-      # ======================================================
+      # ------------------------------------------------------
       # 7. TERRAFORM VALIDATE
-      # ======================================================
+      # ------------------------------------------------------
 
       - name: Terraform Validate
         run: terraform validate
 
 
-      # ======================================================
+      # ------------------------------------------------------
       # 8. TERRAFORM PLAN
-      # ======================================================
+      # ------------------------------------------------------
 
       - name: Terraform Plan
         run: terraform plan -input=false -out=tfplan
 
 
-      # ======================================================
-      # 9. MOSTRAR TERRAFORM PLAN
-      # ======================================================
+      # ------------------------------------------------------
+      # 9. MOSTRAR PLAN
+      # ------------------------------------------------------
 
       - name: Mostrar Terraform Plan
         run: terraform show -no-color tfplan
 
 
-      # ======================================================
+      # ------------------------------------------------------
       # 10. TERRAFORM APPLY
       #
-      # SOLO SE PERMITE:
-      #
-      # - Push a main
-      # - Ejecucion manual con plan_only = false
-      #
-      # NO SE EJECUTA:
-      #
-      # - Push a feature/reproducibilidad
-      # - Ejecucion manual con plan_only = true
-      # ======================================================
+      # Push main                  -> APPLY
+      # Push feature              -> NO APPLY
+      # Manual plan_only=true     -> NO APPLY
+      # Manual plan_only=false    -> APPLY
+      # ------------------------------------------------------
 
       - name: Terraform Apply
         if: |
@@ -143,9 +138,9 @@ jobs:
         run: terraform apply -input=false -auto-approve tfplan
 
 
-      # ======================================================
-      # 11. MOSTRAR OUTPUTS
-      # ======================================================
+      # ------------------------------------------------------
+      # 11. OUTPUTS
+      # ------------------------------------------------------
 
       - name: Terraform Outputs
         if: |
@@ -164,26 +159,23 @@ jobs:
 
     needs: terraform-deploy
 
-    # Solo desplegamos desde main o desde una ejecucion
-    # manual donde plan_only sea false.
-
     if: |
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' && inputs.plan_only == false)
 
     steps:
 
-      # ======================================================
+      # ------------------------------------------------------
       # 1. CHECKOUT
-      # ======================================================
+      # ------------------------------------------------------
 
       - name: Checkout
         uses: actions/checkout@v4
 
 
-      # ======================================================
-      # 2. AUTENTICACION AWS MEDIANTE OIDC
-      # ======================================================
+      # ------------------------------------------------------
+      # 2. AUTENTICACION AWS
+      # ------------------------------------------------------
 
       - name: Autenticarse en AWS
         uses: aws-actions/configure-aws-credentials@v5
@@ -192,17 +184,17 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
 
-      # ======================================================
-      # 3. LOGIN AMAZON ECR
-      # ======================================================
+      # ------------------------------------------------------
+      # 3. LOGIN ECR
+      # ------------------------------------------------------
 
       - name: Login Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
 
-      # ======================================================
+      # ------------------------------------------------------
       # 4. BUILD BACKEND
-      # ======================================================
+      # ------------------------------------------------------
 
       - name: Docker Build Backend
         run: |
@@ -212,9 +204,9 @@ jobs:
             ./backend
 
 
-      # ======================================================
+      # ------------------------------------------------------
       # 5. PUSH BACKEND
-      # ======================================================
+      # ------------------------------------------------------
 
       - name: Docker Push Backend
         run: |
@@ -225,9 +217,9 @@ jobs:
             $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPOSITORY:latest
 
 
-      # ======================================================
+      # ------------------------------------------------------
       # 6. BUILD FRONTEND
-      # ======================================================
+      # ------------------------------------------------------
 
       - name: Docker Build Frontend
         run: |
@@ -237,9 +229,9 @@ jobs:
             ./frontend
 
 
-      # ======================================================
+      # ------------------------------------------------------
       # 7. PUSH FRONTEND
-      # ======================================================
+      # ------------------------------------------------------
 
       - name: Docker Push Frontend
         run: |
@@ -250,9 +242,9 @@ jobs:
             $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_REPOSITORY:latest
 
 
-      # ======================================================
-      # 8. MOSTRAR IMAGENES PUBLICADAS
-      # ======================================================
+      # ------------------------------------------------------
+      # 8. MOSTRAR IMAGENES
+      # ------------------------------------------------------
 
       - name: Mostrar imagenes publicadas
         run: |
@@ -266,7 +258,7 @@ jobs:
 
 
   # ==========================================================
-  # JOB 3 - DEPLOY AUTOMATICO A KUBERNETES
+  # JOB 3 - DEPLOY KUBERNETES
   # ==========================================================
 
   deploy-kubernetes:
@@ -275,25 +267,23 @@ jobs:
 
     needs: docker-ecr
 
-    # Nunca desplegar Kubernetes desde nuestra rama de prueba.
-
     if: |
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' && inputs.plan_only == false)
 
     steps:
 
-      # ======================================================
+      # ------------------------------------------------------
       # 1. CHECKOUT
-      # ======================================================
+      # ------------------------------------------------------
 
       - name: Checkout
         uses: actions/checkout@v4
 
 
-      # ======================================================
-      # 2. AUTENTICACION AWS MEDIANTE OIDC
-      # ======================================================
+      # ------------------------------------------------------
+      # 2. AUTENTICACION AWS
+      # ------------------------------------------------------
 
       - name: Autenticarse en AWS
         uses: aws-actions/configure-aws-credentials@v5
@@ -302,45 +292,138 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
 
-      # ======================================================
-      # 3. DESPLEGAR MEDIANTE AWS SYSTEMS MANAGER
-      # ======================================================
+      # ------------------------------------------------------
+      # 3. OBTENER EC2 DINAMICAMENTE
+      # ------------------------------------------------------
 
-      - name: Desplegar Backend y Frontend en Kubernetes
+      - name: Obtener EC2
+        id: ec2
+        run: |
+          EC2_INSTANCE_ID=$(aws ec2 describe-instances \
+            --region "$AWS_REGION" \
+            --filters \
+              "Name=tag:Name,Values=$EC2_NAME" \
+              "Name=instance-state-name,Values=running" \
+            --query "Reservations[].Instances[].InstanceId" \
+            --output text)
+
+          if [ -z "$EC2_INSTANCE_ID" ] || [ "$EC2_INSTANCE_ID" = "None" ]; then
+            echo "ERROR: No se encontro una EC2 running con Name=$EC2_NAME"
+            exit 1
+          fi
+
+          if [ "$(echo "$EC2_INSTANCE_ID" | wc -w)" -ne 1 ]; then
+            echo "ERROR: Se encontro mas de una EC2 con Name=$EC2_NAME"
+            echo "$EC2_INSTANCE_ID"
+            exit 1
+          fi
+
+          echo "EC2 encontrada: $EC2_INSTANCE_ID"
+
+          echo "EC2_INSTANCE_ID=$EC2_INSTANCE_ID" >> "$GITHUB_ENV"
+
+
+      # ------------------------------------------------------
+      # 4. ESPERAR A QUE SSM ESTE DISPONIBLE
+      # ------------------------------------------------------
+
+      - name: Esperar disponibilidad SSM
+        run: |
+          echo "Esperando que $EC2_INSTANCE_ID este Online en SSM..."
+
+          for i in {1..30}; do
+
+            STATUS=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=$EC2_INSTANCE_ID" \
+              --query "InstanceInformationList[0].PingStatus" \
+              --output text 2>/dev/null || true)
+
+            echo "Intento $i - Estado SSM: $STATUS"
+
+            if [ "$STATUS" = "Online" ]; then
+              echo "SSM esta disponible."
+              exit 0
+            fi
+
+            sleep 10
+
+          done
+
+          echo "ERROR: La instancia no aparecio Online en SSM."
+          exit 1
+
+
+      # ------------------------------------------------------
+      # 5. PREPARAR MANIFIESTOS
+      #
+      # Cambiamos las imagenes iniciales por las imagenes ECR
+      # correspondientes exactamente al commit actual.
+      # ------------------------------------------------------
+
+      - name: Preparar manifiestos Kubernetes
+        run: |
+          BACKEND_IMAGE="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPOSITORY:${{ github.sha }}"
+          FRONTEND_IMAGE="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_REPOSITORY:${{ github.sha }}"
+
+          sed \
+            "s|image: hola-juan-backend:v1|image: $BACKEND_IMAGE|" \
+            kubernetes/backend.yaml > /tmp/backend.yaml
+
+          sed \
+            "s|image: hola-juan-frontend:v1|image: $FRONTEND_IMAGE|" \
+            kubernetes/frontend.yaml > /tmp/frontend.yaml
+
+          cp kubernetes/namespace.yaml /tmp/namespace.yaml
+          cp kubernetes/postgres.yaml /tmp/postgres.yaml
+
+          echo "Manifiestos preparados."
+
+
+      # ------------------------------------------------------
+      # 6. ENVIAR MANIFIESTOS A EC2
+      #
+      # SSM no necesita SSH.
+      # Codificamos los YAML en Base64 para enviarlos de forma
+      # segura dentro del comando remoto.
+      # ------------------------------------------------------
+
+      - name: Desplegar Kubernetes mediante SSM
         run: |
 
           BACKEND_IMAGE="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPOSITORY:${{ github.sha }}"
-
           FRONTEND_IMAGE="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_REPOSITORY:${{ github.sha }}"
 
-          echo "============================================"
-          echo "IMAGEN BACKEND"
-          echo "$BACKEND_IMAGE"
-          echo ""
-          echo "IMAGEN FRONTEND"
-          echo "$FRONTEND_IMAGE"
-          echo "============================================"
+          NAMESPACE_B64=$(base64 -w 0 /tmp/namespace.yaml)
+          POSTGRES_B64=$(base64 -w 0 /tmp/postgres.yaml)
+          BACKEND_B64=$(base64 -w 0 /tmp/backend.yaml)
+          FRONTEND_B64=$(base64 -w 0 /tmp/frontend.yaml)
 
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$EC2_INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
             --comment "Deploy commit ${{ github.sha }} en Kubernetes" \
             --parameters commands="[
+              \"mkdir -p /tmp/hola-juan-k8s\",
+              \"echo '$NAMESPACE_B64' | base64 -d > /tmp/hola-juan-k8s/namespace.yaml\",
+              \"echo '$POSTGRES_B64' | base64 -d > /tmp/hola-juan-k8s/postgres.yaml\",
+              \"echo '$BACKEND_B64' | base64 -d > /tmp/hola-juan-k8s/backend.yaml\",
+              \"echo '$FRONTEND_B64' | base64 -d > /tmp/hola-juan-k8s/frontend.yaml\",
+              \"sudo -u ubuntu -H kubectl apply -f /tmp/hola-juan-k8s/namespace.yaml\",
+              \"sudo -u ubuntu -H kubectl apply -f /tmp/hola-juan-k8s/postgres.yaml\",
+              \"sudo -u ubuntu -H kubectl rollout status deployment/postgres -n hola-juan --timeout=180s\",
               \"sudo -u ubuntu -H bash -lc 'ECR_PASSWORD=\$(aws ecr get-login-password --region $AWS_REGION); minikube ssh -- sudo ctr -n k8s.io images pull --user AWS:\$ECR_PASSWORD $BACKEND_IMAGE'\",
               \"sudo -u ubuntu -H bash -lc 'ECR_PASSWORD=\$(aws ecr get-login-password --region $AWS_REGION); minikube ssh -- sudo ctr -n k8s.io images pull --user AWS:\$ECR_PASSWORD $FRONTEND_IMAGE'\",
-              \"sudo -u ubuntu -H kubectl set image deployment/backend backend=$BACKEND_IMAGE -n hola-juan\",
-              \"sudo -u ubuntu -H kubectl set image deployment/frontend frontend=$FRONTEND_IMAGE -n hola-juan\",
-              \"sudo -u ubuntu -H kubectl rollout status deployment/backend -n hola-juan --timeout=120s\",
-              \"sudo -u ubuntu -H kubectl rollout status deployment/frontend -n hola-juan --timeout=120s\",
-              \"sudo -u ubuntu -H kubectl get pods -n hola-juan -o wide\"
+              \"sudo -u ubuntu -H kubectl apply -f /tmp/hola-juan-k8s/backend.yaml\",
+              \"sudo -u ubuntu -H kubectl apply -f /tmp/hola-juan-k8s/frontend.yaml\",
+              \"sudo -u ubuntu -H kubectl rollout status deployment/backend -n hola-juan --timeout=180s\",
+              \"sudo -u ubuntu -H kubectl rollout status deployment/frontend -n hola-juan --timeout=180s\",
+              \"sudo -u ubuntu -H kubectl get pods -n hola-juan -o wide\",
+              \"sudo -u ubuntu -H kubectl get svc -n hola-juan\"
             ]" \
             --query "Command.CommandId" \
             --output text)
 
-          echo "============================================"
-          echo "SSM COMMAND ID"
-          echo "$COMMAND_ID"
-          echo "============================================"
+          echo "SSM COMMAND ID: $COMMAND_ID"
 
           aws ssm wait command-executed \
             --command-id "$COMMAND_ID" \
@@ -349,3 +432,22 @@ jobs:
           aws ssm get-command-invocation \
             --command-id "$COMMAND_ID" \
             --instance-id "$EC2_INSTANCE_ID"
+
+
+      # ------------------------------------------------------
+      # 7. MOSTRAR URL
+      # ------------------------------------------------------
+
+      - name: Mostrar URL aplicacion
+        run: |
+
+          PUBLIC_IP=$(aws ec2 describe-instances \
+            --instance-ids "$EC2_INSTANCE_ID" \
+            --query "Reservations[0].Instances[0].PublicIpAddress" \
+            --output text)
+
+          echo "============================================"
+          echo "DESPLIEGUE COMPLETADO"
+          echo "URL:"
+          echo "http://$PUBLIC_IP"
+          echo "============================================"
