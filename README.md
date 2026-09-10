@@ -1,396 +1,1022 @@
-ola Juan DevOps
+# 🚀 Hola Juan — DevOps & Cloud Lab
 
-Laboratorio práctico de DevOps y Cloud construido para desplegar una
-aplicación web completa sobre AWS, automatizando la infraestructura,
-construcción de imágenes, publicación en ECR y despliegue en Kubernetes.
+<p align="center">
+  <b>Laboratorio End-to-End de DevOps, Cloud, IaC, CI/CD, Docker y Kubernetes sobre AWS</b>
+</p>
 
-1. Objetivo
+<p align="center">
+  ☁️ AWS &nbsp; • &nbsp;
+  🏗️ Terraform &nbsp; • &nbsp;
+  🐳 Docker &nbsp; • &nbsp;
+  ☸️ Kubernetes &nbsp; • &nbsp;
+  🔄 GitHub Actions &nbsp; • &nbsp;
+  🐘 PostgreSQL
+</p>
 
-Construir una solución reproducible que permita:
+---
 
-Mostrar una aplicación web con el mensaje Hola Juan.
+## 📌 Descripción del proyecto
 
-Consultar registros almacenados en PostgreSQL desde el frontend.
+**Hola Juan DevOps Lab** es un laboratorio práctico construido para implementar una aplicación web completa utilizando principios y herramientas de **DevOps y Cloud Computing**.
 
-Desplegar infraestructura AWS mediante Terraform.
+El proyecto integra infraestructura como código, contenedores, CI/CD, Kubernetes y persistencia de datos.
 
-Construir imágenes Docker de frontend y backend.
+El objetivo principal es demostrar un flujo completo:
 
-Publicar las imágenes en Amazon ECR.
-
-Ejecutar la aplicación en Kubernetes con Minikube sobre EC2.
-
-Automatizar CI/CD mediante GitHub Actions.
-
-Autenticar GitHub Actions contra AWS mediante OIDC.
-
-Mantener los datos de PostgreSQL mediante un PersistentVolumeClaim.
-
-Probar escalamiento, self-healing y persistencia.
-
-2. Arquitectura
-
+```text
+Código
+  ↓
 GitHub
-  |
-  | push
-  v
+  ↓
 GitHub Actions
-  |
-  | OIDC
-  v
-AWS
-  |
-  +-- Terraform --> VPC / Subnet / IGW / SG / EC2 / IAM / ECR
-  |
-  +-- Amazon ECR
-  |      +-- frontend
-  |      +-- backend
-  |
-  +-- EC2 Ubuntu
-         |
-         +-- Docker
-         +-- Minikube / Kubernetes
-               |
-               +-- Frontend (Nginx + HTML)
-               |      |
-               |      +-- NodePort 30080
-               |
-               +-- Backend (Python + Flask)
-               |      |
-               |      +-- ClusterIP :5000
-               |
-               +-- PostgreSQL
-                      |
-                      +-- ClusterIP :5432
-                      +-- PVC 1 GiB
+  ↓
+Terraform + Docker
+  ↓
+AWS + Amazon ECR
+  ↓
+Kubernetes
+  ↓
+Frontend → Backend → PostgreSQL
+```
 
-Acceso externo:
+La aplicación muestra el mensaje:
 
-Internet
-   |
-   v
-EC2 :80
-   |
-   v
-Nginx host
-   |
-   v
-Minikube NodePort :30080
-   |
-   v
-Frontend
-   |
-   v
-Backend REST API
-   |
-   v
-PostgreSQL + PVC
+> 👋 **Hola Juan**
 
-3. Tecnologías utilizadas
+y permite consultar información almacenada en PostgreSQL desde el navegador.
 
-Tecnología            Uso
+---
 
-AWS                   Plataforma cloud
-Terraform             Infraestructura como código
-GitHub                Repositorio de código
-GitHub Actions        CI/CD
-OIDC                  Autenticación GitHub -> AWS sin Access Keys permanentes
-Docker                Construcción de imágenes
-Amazon ECR            Registro de imágenes
-EC2 Ubuntu            Servidor del laboratorio
-Minikube              Cluster Kubernetes
-Kubernetes            Orquestación
-Nginx                 Frontend y reverse proxy
-Python / Flask        API REST
-PostgreSQL            Base de datos
-PVC                   Persistencia de PostgreSQL
-AWS Systems Manager   Ejecución remota usada por el pipeline
+# 🏗️ Arquitectura de la solución
 
-4. Estructura del repositorio
+```mermaid
+flowchart LR
 
+    DEV["👨‍💻 Código Fuente"]
+
+    GH["🐙 GitHub"]
+    GA["⚙️ GitHub Actions"]
+
+    TF["🏗️ Terraform"]
+    ECR["📦 Amazon ECR"]
+
+    AWS["☁️ AWS"]
+    EC2["🖥️ EC2 Ubuntu"]
+
+    K8S["☸️ Kubernetes / Minikube"]
+
+    FRONT["🌐 Frontend<br/>Nginx + HTML"]
+    BACK["⚙️ Backend<br/>Python + Flask"]
+    DB["🐘 PostgreSQL"]
+    PVC["💾 PVC<br/>1 GiB"]
+
+    DEV --> GH
+    GH --> GA
+
+    GA --> TF
+    TF --> AWS
+    AWS --> EC2
+
+    GA --> ECR
+    ECR --> K8S
+
+    EC2 --> K8S
+
+    K8S --> FRONT
+    FRONT --> BACK
+    BACK --> DB
+    DB --> PVC
+```
+
+### Flujo de acceso a la aplicación
+
+```text
+                    INTERNET
+                        │
+                        ▼
+                 ┌──────────────┐
+                 │   AWS EC2    │
+                 │    Ubuntu    │
+                 └──────┬───────┘
+                        │
+                      :80
+                        │
+                        ▼
+                 ┌──────────────┐
+                 │ Nginx Host   │
+                 └──────┬───────┘
+                        │
+                        ▼
+                NodePort :30080
+                        │
+                        ▼
+              ┌─────────────────┐
+              │    FRONTEND     │
+              │  Nginx + HTML   │
+              └────────┬────────┘
+                       │
+                       │ /api
+                       ▼
+              ┌─────────────────┐
+              │     BACKEND     │
+              │ Python + Flask  │
+              │     :5000       │
+              └────────┬────────┘
+                       │
+                       ▼
+              ┌─────────────────┐
+              │   PostgreSQL    │
+              │      :5432      │
+              └────────┬────────┘
+                       │
+                       ▼
+              ┌─────────────────┐
+              │ postgres-pvc    │
+              │      1 GiB      │
+              └─────────────────┘
+```
+
+---
+
+# 🧰 Stack tecnológico
+
+| Área | Tecnología | Función |
+|---|---|---|
+| ☁️ Cloud | AWS | Plataforma de infraestructura |
+| 🏗️ IaC | Terraform | Aprovisionamiento de infraestructura |
+| 🐳 Contenedores | Docker | Construcción de imágenes |
+| 📦 Registry | Amazon ECR | Almacenamiento de imágenes Docker |
+| ☸️ Orquestación | Kubernetes | Gestión de contenedores |
+| 🧪 Cluster | Minikube | Kubernetes ejecutado sobre EC2 |
+| 🔄 CI/CD | GitHub Actions | Automatización del pipeline |
+| 🔐 Autenticación | OIDC | Acceso GitHub → AWS sin Access Keys permanentes |
+| 🌐 Frontend | Nginx + HTML | Interfaz web |
+| ⚙️ Backend | Python + Flask | API REST |
+| 🐘 Database | PostgreSQL | Persistencia de información |
+| 💾 Storage | PVC | Persistencia del almacenamiento |
+| 🐧 Sistema | Ubuntu | Sistema operativo de EC2 |
+| 🛠️ Gestión | AWS Systems Manager | Ejecución remota utilizada por CI/CD |
+
+---
+
+# 📂 Estructura del proyecto
+
+```text
 hola-juan-devops/
+│
 ├── .github/
 │   └── workflows/
 │       └── pipeline.yml
+│
 ├── backend/
 │   ├── app.py
 │   ├── Dockerfile
 │   └── requirements.txt
+│
 ├── frontend/
 │   ├── Dockerfile
 │   ├── index.html
 │   └── nginx.conf
+│
 ├── kubernetes/
-│   ├── backend.yaml
-│   ├── frontend.yaml
-│   ├── ingress.yaml
 │   ├── namespace.yaml
-│   └── postgres.yaml
+│   ├── frontend.yaml
+│   ├── backend.yaml
+│   ├── postgres.yaml
+│   └── ingress.yaml
+│
 ├── terraform/
+│   ├── providers.tf
+│   ├── variables.tf
+│   ├── terraform.tfvars
+│   ├── network.tf
+│   ├── security.tf
 │   ├── ec2.tf
 │   ├── ecr.tf
 │   ├── iam-ec2.tf
 │   ├── iam-github-ssm.tf
-│   ├── network.tf
 │   ├── outputs.tf
-│   ├── providers.tf
-│   ├── security.tf
-│   ├── terraform.tfvars
-│   ├── user-data.sh
-│   └── variables.tf
+│   └── user-data.sh
+│
 ├── bootstrap/
 │   └── main.tf
+│
 ├── .gitignore
 └── README.md
+```
 
-5. Infraestructura AWS con Terraform
+---
 
-Terraform administra los componentes principales del laboratorio:
+# ☁️ Infraestructura AWS
 
-VPC 10.0.0.0/16.
+La infraestructura del laboratorio se administra mediante **Terraform**, evitando crear manualmente los recursos principales.
 
-Subred pública 10.0.1.0/24.
+## Recursos implementados
 
-Internet Gateway.
+```text
+AWS
+│
+├── VPC
+│   └── 10.0.0.0/16
+│
+├── Public Subnet
+│   └── 10.0.1.0/24
+│
+├── Internet Gateway
+│
+├── Route Table
+│   └── 0.0.0.0/0 → Internet Gateway
+│
+├── Security Group
+│   ├── TCP/22 → SSH
+│   └── TCP/80 → HTTP
+│
+├── EC2
+│   └── Ubuntu
+│
+├── IAM
+│   ├── EC2 Role
+│   ├── ECR permissions
+│   └── Systems Manager
+│
+├── Amazon ECR
+│   ├── frontend
+│   └── backend
+│
+└── Amazon S3
+    └── Terraform Remote State
+```
 
-Tabla de rutas con salida 0.0.0.0/0.
+Terraform permite que la infraestructura sea:
 
-Security Group para SSH y HTTP.
+- ♻️ Reproducible
+- 📋 Versionada
+- 🤖 Automatizable
+- 🔍 Auditable
+- 🧱 Declarativa
 
-Instancia EC2 Ubuntu.
+---
 
-IAM Role e Instance Profile para EC2.
+# 🏗️ Terraform
 
-Permisos de lectura de ECR desde EC2.
+El flujo básico utilizado es:
 
-Integración con AWS Systems Manager.
+```bash
+cd terraform
 
-Repositorios ECR para frontend y backend.
+terraform init
+terraform fmt
+terraform validate
+terraform plan
+terraform apply
+```
 
-Backend remoto de Terraform en Amazon S3.
+### Backend remoto
 
-El servidor se inicializa mediante user-data.sh, instalando Docker,
-kubectl, Minikube, AWS CLI y Nginx. Minikube se configura como servicio
-systemd para iniciar automáticamente con la EC2.
+El estado de Terraform se almacena en Amazon S3.
 
-6. Pipeline CI/CD
+```text
+Terraform
+    │
+    ▼
+Amazon S3
+    │
+    ▼
+terraform.tfstate
+```
 
-Flujo implementado:
+Esto evita depender únicamente de un archivo de estado local.
 
-git push
-   |
-   v
+---
+
+# 🔐 GitHub Actions + AWS OIDC
+
+GitHub Actions se autentica contra AWS mediante **OpenID Connect (OIDC)**.
+
+```text
 GitHub Actions
-   |
-   +--> Terraform validate/plan/apply
-   |
-   +--> Docker build
-   |
-   +--> Amazon ECR
-   |
-   +--> Despliegue Kubernetes por SSM
-   |
-   +--> Rollout / verificación
+       │
+       │ OIDC Token
+       ▼
+AWS IAM Role
+       │
+       ▼
+Credenciales temporales
+       │
+       ▼
+AWS
+```
 
-GitHub Actions se autentica contra AWS utilizando OIDC, evitando
-almacenar Access Keys permanentes como secretos del repositorio.
+### Ventaja
 
-Las imágenes se publican en ECR identificadas con el SHA del commit para
-mejorar la trazabilidad del despliegue.
+No es necesario almacenar credenciales AWS permanentes como:
 
-7. Kubernetes
+```text
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+```
 
-Namespace utilizado:
+Esto mejora la seguridad del pipeline.
 
-kubectl get pods -n hola-juan
+---
 
-Workloads principales:
+# 🔄 Pipeline CI/CD
 
-frontend: Nginx + HTML.
+El pipeline automatiza el proceso desde GitHub hasta Kubernetes.
 
-backend: API REST Flask.
+```mermaid
+flowchart LR
 
-postgres: PostgreSQL 17.
+    A["💻 Git Push"]
+    B["⚙️ GitHub Actions"]
+    C["🏗️ Terraform"]
+    D["🐳 Docker Build"]
+    E["📦 Amazon ECR"]
+    F["☸️ Kubernetes"]
+    G["🚀 Aplicación"]
 
-Servicios:
+    A --> B
+    B --> C
+    B --> D
+    D --> E
+    E --> F
+    F --> G
+```
 
-Frontend: NodePort 30080.
+## Flujo
 
-Backend: ClusterIP 5000.
+```text
+1. Developer realiza git push
+            │
+            ▼
+2. GitHub Actions inicia pipeline
+            │
+            ▼
+3. Terraform valida/aplica infraestructura
+            │
+            ▼
+4. Docker construye las imágenes
+            │
+            ▼
+5. Imágenes se publican en Amazon ECR
+            │
+            ▼
+6. GitHub Actions utiliza AWS SSM
+            │
+            ▼
+7. Kubernetes actualiza los Deployments
+            │
+            ▼
+8. Rollout de frontend/backend
+            │
+            ▼
+9. Aplicación disponible
+```
 
-PostgreSQL: ClusterIP 5432.
+Las imágenes Docker se identifican mediante el **SHA del commit**, proporcionando trazabilidad entre código e imagen desplegada.
 
-8. Persistencia PostgreSQL
+---
 
-Se creó:
+# 🐳 Docker
 
-PersistentVolumeClaim: postgres-pvc
-StorageClass: standard
-Capacidad: 1Gi
-Access Mode: ReadWriteOnce
-Estado esperado: Bound
+El proyecto contiene imágenes independientes para frontend y backend.
 
-El volumen se monta en:
+## Frontend
 
+```text
+HTML
+  ↓
+Nginx
+  ↓
+Docker Image
+  ↓
+Amazon ECR
+```
+
+## Backend
+
+```text
+Python
+  ↓
+Flask
+  ↓
+Docker Image
+  ↓
+Amazon ECR
+```
+
+Posteriormente Kubernetes utiliza estas imágenes para crear los pods.
+
+---
+
+# ☸️ Kubernetes
+
+El cluster Kubernetes se ejecuta utilizando **Minikube sobre la instancia EC2**.
+
+Namespace:
+
+```text
+hola-juan
+```
+
+Arquitectura interna:
+
+```text
+Namespace: hola-juan
+│
+├── Deployment
+│      └── frontend
+│
+├── Deployment
+│      └── backend
+│
+├── Deployment
+│      └── postgres
+│
+├── Service
+│      └── frontend
+│           NodePort :30080
+│
+├── Service
+│      └── backend
+│           ClusterIP :5000
+│
+├── Service
+│      └── postgres
+│           ClusterIP :5432
+│
+└── PersistentVolumeClaim
+       └── postgres-pvc
+            1 GiB
+```
+
+---
+
+# 🌐 Frontend
+
+El frontend utiliza:
+
+```text
+HTML + Nginx
+```
+
+Su responsabilidad es:
+
+- Mostrar la interfaz web.
+- Mostrar el mensaje **Hola Juan**.
+- Consumir la API del backend.
+- Mostrar los registros almacenados en PostgreSQL.
+
+Flujo:
+
+```text
+Usuario
+   ↓
+Nginx
+   ↓
+Frontend
+   ↓
+/api/personas
+   ↓
+Backend
+```
+
+---
+
+# ⚙️ Backend REST API
+
+El backend está desarrollado con:
+
+```text
+Python + Flask
+```
+
+Su función es comunicarse con PostgreSQL y exponer los datos mediante una API REST.
+
+Flujo:
+
+```text
+Frontend
+    │
+    ▼
+Flask API
+    │
+    ▼
+PostgreSQL
+```
+
+Entre las operaciones implementadas se encuentran:
+
+```text
+GET  /api/personas
+POST /api/personas
+```
+
+---
+
+# 🐘 PostgreSQL
+
+PostgreSQL almacena los registros utilizados por la aplicación.
+
+Ejemplo:
+
+```text
+ID    Nombre        Profesión
+--------------------------------
+1     Juan          DevOps
+2     PruebaPVC     DevOps
+```
+
+Consulta utilizada durante las pruebas:
+
+```bash
+kubectl exec -n hola-juan deployment/postgres -- \
+psql -U juan -d holajuan \
+-c "SELECT * FROM personas;"
+```
+
+---
+
+# 💾 Persistencia con PVC
+
+Inicialmente PostgreSQL utilizaba almacenamiento efímero.
+
+El problema era:
+
+```text
+PostgreSQL Pod
+      │
+      X
+ Pod eliminado
+      │
+      ▼
+Posible pérdida de datos
+```
+
+Se implementó:
+
+```text
+PostgreSQL Pod
+      │
+      ▼
 /var/lib/postgresql/data
+      │
+      ▼
+postgres-pvc
+      │
+      ▼
+PersistentVolume
+```
 
-Comandos de verificación:
+Configuración:
 
-kubectl get pvc -n hola-juan
-kubectl get pv
+| Propiedad | Valor |
+|---|---|
+| PVC | `postgres-pvc` |
+| Capacidad | `1Gi` |
+| Access Mode | `ReadWriteOnce` |
+| StorageClass | `standard` |
+| Estado comprobado | `Bound` |
 
-Resultado comprobado durante el laboratorio:
+### Evidencia obtenida
 
+```text
 postgres-pvc   Bound   1Gi   RWO   standard
+```
 
-Prueba de persistencia
+---
 
-Se insertó un registro adicional:
+# 🧪 Prueba real de persistencia
 
+Se insertó:
+
+```sql
 INSERT INTO personas (nombre, profesion)
 VALUES ('PruebaPVC', 'DevOps');
+```
 
-Después se eliminó el pod de PostgreSQL. Kubernetes creó un nuevo pod y
-el registro continuó existiendo.
+Después se eliminó el pod PostgreSQL.
 
-Resultado: persistencia mediante PVC comprobada.
+```bash
+kubectl delete pod -n hola-juan -l app=postgres
+```
 
-9. Escalamiento
+Kubernetes creó automáticamente otro pod.
 
-Se escaló el frontend de una a tres réplicas:
+Finalmente:
 
-kubectl scale deployment frontend -n hola-juan --replicas=3
-kubectl get pods -n hola-juan -l app=frontend -o wide
+```sql
+SELECT * FROM personas;
+```
 
-Resultado: tres pods Running.
+El registro:
+
+```text
+PruebaPVC | DevOps
+```
+
+continuó existiendo.
+
+### Resultado
+
+> 💾 **Persistencia comprobada correctamente.**
+
+---
+
+# 📈 Escalamiento Kubernetes
+
+El frontend inicialmente tenía:
+
+```text
+1 réplica
+```
+
+Se ejecutó:
+
+```bash
+kubectl scale deployment frontend \
+-n hola-juan \
+--replicas=3
+```
+
+Resultado:
+
+```text
+Frontend Deployment
+       │
+       ├── Pod 1 ✅
+       ├── Pod 2 ✅
+       └── Pod 3 ✅
+```
+
+Los tres pods quedaron:
+
+```text
+1/1 Running
+```
 
 Después de la prueba se regresó a una réplica:
 
-kubectl scale deployment frontend -n hola-juan --replicas=1
+```bash
+kubectl scale deployment frontend \
+-n hola-juan \
+--replicas=1
+```
 
-10. Self-healing
+---
 
-Se eliminó manualmente un pod del frontend:
+# ♻️ Self-Healing
 
-kubectl delete pod <frontend-pod> -n hola-juan
+También se comprobó la capacidad de recuperación automática de Kubernetes.
 
-El Deployment detectó que faltaba una réplica y el ReplicaSet creó
-automáticamente un nuevo pod.
+Se eliminó manualmente uno de los pods del frontend:
 
-Resultado: self-healing comprobado.
+```bash
+kubectl delete pod <frontend-pod> \
+-n hola-juan
+```
 
-11. Verificaciones finales
+El Deployment detectó:
 
-Estado final comprobado:
+```text
+Réplicas deseadas: 3
+Réplicas disponibles: 2
+```
 
-Backend       1/1 Running
-Frontend      1/1 Running
-PostgreSQL    1/1 Running
-postgres-pvc  Bound
+El ReplicaSet creó automáticamente un nuevo pod.
 
-Pruebas realizadas:
+```text
+Pod eliminado ❌
+      │
+      ▼
+Deployment detecta cambio
+      │
+      ▼
+ReplicaSet crea nuevo Pod
+      │
+      ▼
+3/3 Running ✅
+```
 
-Prueba                            Resultado
+### Resultado
 
-Terraform / AWS                   OK
-GitHub Actions                    OK
-OIDC GitHub -> AWS               OK
-Docker Build                      OK
-Push Amazon ECR                   OK
-Deploy Kubernetes                 OK
-Frontend                          OK
-Backend REST API                  OK
-PostgreSQL                        OK
-PVC 1 GiB                         OK
-Persistencia tras recrear pod     OK
-Escalamiento 1 -> 3              OK
-Self-healing                      OK
-Acceso web público                OK
-Minikube auto-start con systemd   OK
+> ♻️ **Self-healing de Kubernetes comprobado.**
 
-12. Comandos útiles
+---
 
-# Estado general
+# ⚡ Inicio automático de Minikube
+
+Minikube fue configurado mediante **systemd** para iniciar automáticamente con la instancia EC2.
+
+```text
+EC2 inicia
+    │
+    ▼
+Docker Service
+    │
+    ▼
+minikube.service
+    │
+    ▼
+Minikube
+    │
+    ▼
+Kubernetes
+```
+
+Esto evita tener que iniciar manualmente Minikube después de reiniciar la EC2.
+
+---
+
+# 🧪 Pruebas realizadas
+
+| Prueba | Resultado |
+|---|:---:|
+| Terraform deployment | ✅ PASS |
+| Infraestructura AWS | ✅ PASS |
+| GitHub Actions | ✅ PASS |
+| OIDC GitHub → AWS | ✅ PASS |
+| Docker Build | ✅ PASS |
+| Push Amazon ECR | ✅ PASS |
+| Deploy Kubernetes | ✅ PASS |
+| Frontend | ✅ PASS |
+| Backend REST API | ✅ PASS |
+| PostgreSQL | ✅ PASS |
+| PVC 1 GiB | ✅ PASS |
+| PVC estado Bound | ✅ PASS |
+| Persistencia después de eliminar PostgreSQL | ✅ PASS |
+| Escalamiento 1 → 3 | ✅ PASS |
+| Self-healing | ✅ PASS |
+| Minikube auto-start | ✅ PASS |
+| Aplicación desde navegador | ✅ PASS |
+
+---
+
+# 📊 Estado final
+
+```text
+┌─────────────────────────────────────────┐
+│           HOLA JUAN DEVOPS LAB          │
+├─────────────────────────────────────────┤
+│                                         │
+│  Frontend          1/1 Running     ✅   │
+│  Backend           1/1 Running     ✅   │
+│  PostgreSQL        1/1 Running     ✅   │
+│  postgres-pvc      Bound           ✅   │
+│  GitHub Actions    Success         ✅   │
+│  Amazon ECR        Images          ✅   │
+│  Terraform         AWS             ✅   │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+---
+
+# 🖥️ Comandos útiles
+
+### Ver pods
+
+```bash
 kubectl get pods -n hola-juan
+```
+
+### Ver servicios
+
+```bash
 kubectl get svc -n hola-juan
+```
+
+### Ver PVC
+
+```bash
 kubectl get pvc -n hola-juan
+```
 
-# Despliegues
-kubectl get deployments -n hola-juan
+### Ver Persistent Volumes
 
-# Logs
-kubectl logs -n hola-juan deployment/backend
-kubectl logs -n hola-juan deployment/frontend
-kubectl logs -n hola-juan deployment/postgres
-
-# Escalamiento
-kubectl scale deployment frontend -n hola-juan --replicas=3
-
-# Rollout
-kubectl rollout status deployment/frontend -n hola-juan
-kubectl rollout status deployment/backend -n hola-juan
-
-# PostgreSQL
-kubectl exec -n hola-juan deployment/postgres -- \
-  psql -U juan -d holajuan -c "SELECT * FROM personas;"
-
-# Persistencia
-kubectl get pvc -n hola-juan
+```bash
 kubectl get pv
+```
 
-13. Resultados y aprendizajes
+### Ver deployments
 
-El laboratorio demuestra de forma práctica la integración entre Cloud,
-IaC, contenedores, CI/CD y Kubernetes.
+```bash
+kubectl get deployments -n hola-juan
+```
 
-Se implementaron y probaron:
+### Logs backend
 
-Aprovisionamiento reproducible con Terraform.
+```bash
+kubectl logs -n hola-juan deployment/backend
+```
 
-Autenticación federada mediante OIDC.
+### Logs PostgreSQL
 
-Construcción y versionamiento de imágenes.
+```bash
+kubectl logs -n hola-juan deployment/postgres
+```
 
-Registro privado con Amazon ECR.
+### Consultar PostgreSQL
 
-Despliegues automatizados.
+```bash
+kubectl exec -n hola-juan deployment/postgres -- \
+psql -U juan -d holajuan \
+-c "SELECT * FROM personas;"
+```
 
-Orquestación con Kubernetes.
+### Escalar frontend
 
-Comunicación frontend -> backend -> PostgreSQL.
+```bash
+kubectl scale deployment frontend \
+-n hola-juan \
+--replicas=3
+```
 
-Persistencia mediante PVC.
+### Ver rollout
 
-Escalamiento horizontal manual.
+```bash
+kubectl rollout status deployment/frontend \
+-n hola-juan
+```
 
-Recuperación automática de pods.
+---
 
-Automatización del inicio de Minikube mediante systemd.
+# 🔒 Seguridad aplicada
 
-14. Consideraciones
+Durante el laboratorio se utilizaron diferentes controles:
 
-Este entorno es un laboratorio de aprendizaje, no una arquitectura
-productiva.
+```text
+GitHub
+   │
+   │ OIDC
+   ▼
+IAM Role
+   │
+   ▼
+AWS
+```
 
-Minikube ejecuta Kubernetes dentro de una única EC2, por lo que no
-proporciona alta disponibilidad real de nodos. El PVC usa el
-StorageClass minikube-hostpath; protege los datos frente a la
-recreación del pod, pero no debe considerarse almacenamiento productivo
-frente a la pérdida completa del nodo/cluster.
+Además:
 
-En producción podrían utilizarse servicios como Amazon EKS, Amazon EBS
-CSI, Amazon RDS, balanceadores administrados, AWS Secrets Manager y una
-estrategia de observabilidad centralizada.
+- 🔐 Autenticación GitHub → AWS mediante OIDC.
+- 🔑 SSH limitado a una IP autorizada.
+- 🛡️ Security Groups.
+- 🌐 VPC y subnet controladas mediante Terraform.
+- 📦 EC2 con permisos de lectura de ECR.
+- ⚙️ AWS Systems Manager para automatización del deployment.
+- 🔒 Terraform State almacenado remotamente en S3.
 
-15. Limpieza
+---
 
-Cuando ya no se necesite el laboratorio, revisar primero las evidencias
-y posteriormente destruir los recursos administrados por Terraform para
-evitar costos innecesarios.
+# 🎓 ¿Qué demuestra este laboratorio?
 
+Este proyecto demuestra conocimientos prácticos en:
+
+```text
+                 DEVOPS
+                    │
+       ┌────────────┼─────────────┐
+       │            │             │
+       ▼            ▼             ▼
+      CLOUD        CI/CD      CONTAINERS
+       │            │             │
+       ▼            ▼             ▼
+      AWS      GitHub Actions    Docker
+       │                          │
+       ▼                          ▼
+   Terraform                  Kubernetes
+                                  │
+                                  ▼
+                             PostgreSQL
+```
+
+Entre los conceptos practicados se encuentran:
+
+- Infrastructure as Code.
+- Automatización CI/CD.
+- Dockerización de aplicaciones.
+- Registro de imágenes.
+- Kubernetes Deployments.
+- Services.
+- Persistent Volumes.
+- PersistentVolumeClaims.
+- Escalamiento.
+- Self-healing.
+- IAM.
+- OIDC.
+- AWS Systems Manager.
+- Git y GitHub.
+- Troubleshooting de infraestructura y Kubernetes.
+
+---
+
+# ⚠️ Consideraciones del laboratorio
+
+Este proyecto es un **entorno educativo**, no una arquitectura productiva.
+
+Minikube se ejecuta dentro de una sola instancia EC2:
+
+```text
+EC2
+ └── Minikube
+       └── Kubernetes
+```
+
+Por esta razón, aunque Kubernetes puede recuperar pods, existe un único nodo físico/virtual para el cluster.
+
+El PVC utiliza:
+
+```text
+minikube-hostpath
+```
+
+Por lo tanto, protege los datos frente a la recreación de un **pod**, pero no representa una solución de alta disponibilidad frente a la pérdida completa de la instancia EC2 o del cluster Minikube.
+
+En un entorno productivo podrían utilizarse:
+
+```text
+Amazon EKS
+Amazon EBS CSI Driver
+Amazon RDS
+AWS Secrets Manager
+Application Load Balancer
+CloudWatch
+Prometheus
+Grafana
+```
+
+---
+
+# 🧹 Limpieza del laboratorio
+
+Cuando el laboratorio ya no sea necesario, los recursos AWS deben eliminarse para evitar costos.
+
+Antes:
+
+```bash
 terraform plan -destroy
-terraform destroy
+```
 
-No ejecutar la destrucción hasta confirmar que el laboratorio y sus
-evidencias ya no son necesarios.# devops
-practica de devops
+Después, únicamente cuando se haya confirmado que todo puede eliminarse:
+
+```bash
+terraform destroy
+```
+
+> ⚠️ **No ejecutar `terraform destroy` mientras se necesite conservar el laboratorio.**
+
+---
+
+# 🏆 Resultado
+
+El laboratorio consiguió integrar exitosamente:
+
+```text
+                    ☁️ AWS
+                      │
+              🏗️ Terraform
+                      │
+                 🖥️ EC2
+                      │
+                 ☸️ Minikube
+                      │
+                Kubernetes
+             ┌────────┼────────┐
+             │        │        │
+             ▼        ▼        ▼
+         Frontend  Backend  PostgreSQL
+                              │
+                              ▼
+                          💾 PVC 1GiB
+
+GitHub ──► GitHub Actions ──► Docker ──► ECR ──► Kubernetes
+```
+
+### ✅ Infraestructura automatizada  
+### ✅ CI/CD funcionando  
+### ✅ Contenedores versionados  
+### ✅ Kubernetes funcionando  
+### ✅ Base de datos persistente  
+### ✅ Escalamiento comprobado  
+### ✅ Self-healing comprobado  
+### ✅ Aplicación accesible desde Internet  
+
+---
+
+# 👨‍💻 Autor
+
+**Juan Sebastián Ferrer Bustos**
+
+Ingeniero Electrónico | Especialista en Seguridad Informática
+
+**DevOps • Cloud • AWS • Terraform • Docker • Kubernetes • Seguridad**
+
+---
+
+<p align="center">
+  <b>🚀 Build • Automate • Deploy • Learn • Repeat</b>
+</p>
+
+<p align="center">
+  <i>Pequeños laboratorios, grandes oportunidades.</i>
+</p>
