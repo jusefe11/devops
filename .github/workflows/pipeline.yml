@@ -12,6 +12,7 @@ on:
   push:
     branches:
       - main
+      - feature/reproducibilidad
 
 
 permissions:
@@ -32,6 +33,7 @@ jobs:
   # ==========================================================
   # JOB 1 - TERRAFORM
   # ==========================================================
+
   terraform-deploy:
     name: Terraform Plan and Apply
     runs-on: ubuntu-latest
@@ -45,6 +47,7 @@ jobs:
       # ======================================================
       # 1. CHECKOUT
       # ======================================================
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -52,6 +55,7 @@ jobs:
       # ======================================================
       # 2. AUTENTICACION AWS MEDIANTE OIDC
       # ======================================================
+
       - name: Autenticarse en AWS
         uses: aws-actions/configure-aws-credentials@v5
         with:
@@ -62,6 +66,7 @@ jobs:
       # ======================================================
       # 3. VERIFICAR IDENTIDAD AWS
       # ======================================================
+
       - name: Verificar identidad AWS
         run: aws sts get-caller-identity
         working-directory: .
@@ -70,6 +75,7 @@ jobs:
       # ======================================================
       # 4. INSTALAR TERRAFORM
       # ======================================================
+
       - name: Instalar Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -79,6 +85,7 @@ jobs:
       # ======================================================
       # 5. TERRAFORM INIT
       # ======================================================
+
       - name: Terraform Init
         run: terraform init
 
@@ -86,6 +93,7 @@ jobs:
       # ======================================================
       # 6. TERRAFORM FORMAT
       # ======================================================
+
       - name: Terraform Format
         run: terraform fmt -check
 
@@ -93,6 +101,7 @@ jobs:
       # ======================================================
       # 7. TERRAFORM VALIDATE
       # ======================================================
+
       - name: Terraform Validate
         run: terraform validate
 
@@ -100,6 +109,7 @@ jobs:
       # ======================================================
       # 8. TERRAFORM PLAN
       # ======================================================
+
       - name: Terraform Plan
         run: terraform plan -input=false -out=tfplan
 
@@ -107,6 +117,7 @@ jobs:
       # ======================================================
       # 9. MOSTRAR TERRAFORM PLAN
       # ======================================================
+
       - name: Mostrar Terraform Plan
         run: terraform show -no-color tfplan
 
@@ -114,45 +125,58 @@ jobs:
       # ======================================================
       # 10. TERRAFORM APPLY
       #
-      # PUSH NORMAL:
-      #   SI ejecuta Apply
+      # SOLO SE PERMITE:
       #
-      # WORKFLOW MANUAL CON plan_only=false:
-      #   SI ejecuta Apply
+      # - Push a main
+      # - Ejecucion manual con plan_only = false
       #
-      # WORKFLOW MANUAL CON plan_only=true:
-      #   NO ejecuta Apply
+      # NO SE EJECUTA:
+      #
+      # - Push a feature/reproducibilidad
+      # - Ejecucion manual con plan_only = true
       # ======================================================
+
       - name: Terraform Apply
-        if: ${{ github.event_name == 'push' || inputs.plan_only == false }}
+        if: |
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'workflow_dispatch' && inputs.plan_only == false)
         run: terraform apply -input=false -auto-approve tfplan
 
 
       # ======================================================
       # 11. MOSTRAR OUTPUTS
       # ======================================================
+
       - name: Terraform Outputs
-        if: ${{ github.event_name == 'push' || inputs.plan_only == false }}
+        if: |
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'workflow_dispatch' && inputs.plan_only == false)
         run: terraform output
 
 
   # ==========================================================
-  # JOB 2 - BUILD Y PUSH DOCKER A ECR
+  # JOB 2 - DOCKER BUILD + ECR
   # ==========================================================
+
   docker-ecr:
     name: Docker Build and Push to ECR
     runs-on: ubuntu-latest
 
     needs: terraform-deploy
 
-    # No ejecutar Docker/ECR cuando solamente queremos Plan
-    if: ${{ github.event_name == 'push' || inputs.plan_only == false }}
+    # Solo desplegamos desde main o desde una ejecucion
+    # manual donde plan_only sea false.
+
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.plan_only == false)
 
     steps:
 
       # ======================================================
       # 1. CHECKOUT
       # ======================================================
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -160,6 +184,7 @@ jobs:
       # ======================================================
       # 2. AUTENTICACION AWS MEDIANTE OIDC
       # ======================================================
+
       - name: Autenticarse en AWS
         uses: aws-actions/configure-aws-credentials@v5
         with:
@@ -170,6 +195,7 @@ jobs:
       # ======================================================
       # 3. LOGIN AMAZON ECR
       # ======================================================
+
       - name: Login Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
@@ -177,6 +203,7 @@ jobs:
       # ======================================================
       # 4. BUILD BACKEND
       # ======================================================
+
       - name: Docker Build Backend
         run: |
           docker build \
@@ -188,6 +215,7 @@ jobs:
       # ======================================================
       # 5. PUSH BACKEND
       # ======================================================
+
       - name: Docker Push Backend
         run: |
           docker push \
@@ -200,6 +228,7 @@ jobs:
       # ======================================================
       # 6. BUILD FRONTEND
       # ======================================================
+
       - name: Docker Build Frontend
         run: |
           docker build \
@@ -211,6 +240,7 @@ jobs:
       # ======================================================
       # 7. PUSH FRONTEND
       # ======================================================
+
       - name: Docker Push Frontend
         run: |
           docker push \
@@ -221,8 +251,9 @@ jobs:
 
 
       # ======================================================
-      # 8. MOSTRAR IMAGENES
+      # 8. MOSTRAR IMAGENES PUBLICADAS
       # ======================================================
+
       - name: Mostrar imagenes publicadas
         run: |
           echo "============================================"
@@ -235,22 +266,27 @@ jobs:
 
 
   # ==========================================================
-  # JOB 3 - DEPLOY AUTOMATICO KUBERNETES
+  # JOB 3 - DEPLOY AUTOMATICO A KUBERNETES
   # ==========================================================
+
   deploy-kubernetes:
     name: Deploy Kubernetes
     runs-on: ubuntu-latest
 
     needs: docker-ecr
 
-    # Tampoco desplegar cuando solamente queremos Terraform Plan
-    if: ${{ github.event_name == 'push' || inputs.plan_only == false }}
+    # Nunca desplegar Kubernetes desde nuestra rama de prueba.
+
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.plan_only == false)
 
     steps:
 
       # ======================================================
       # 1. CHECKOUT
       # ======================================================
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -258,6 +294,7 @@ jobs:
       # ======================================================
       # 2. AUTENTICACION AWS MEDIANTE OIDC
       # ======================================================
+
       - name: Autenticarse en AWS
         uses: aws-actions/configure-aws-credentials@v5
         with:
@@ -266,8 +303,9 @@ jobs:
 
 
       # ======================================================
-      # 3. DESPLEGAR MEDIANTE SSM
+      # 3. DESPLEGAR MEDIANTE AWS SYSTEMS MANAGER
       # ======================================================
+
       - name: Desplegar Backend y Frontend en Kubernetes
         run: |
 
