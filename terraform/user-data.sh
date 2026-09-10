@@ -4,7 +4,6 @@ set -e
 
 export DEBIAN_FRONTEND=noninteractive
 
-
 # ============================================================
 # LOG DEL BOOTSTRAP
 # ============================================================
@@ -138,26 +137,54 @@ echo "Docker disponible."
 
 
 # ============================================================
-# 9. INICIAR MINIKUBE
+# 9. CREAR SERVICIO SYSTEMD PARA MINIKUBE
 # ============================================================
 
-echo "Iniciando Minikube..."
+cat > /etc/systemd/system/minikube.service <<'EOF'
+[Unit]
+Description=Minikube Kubernetes Cluster
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
 
-sudo -u ubuntu -H minikube start \
-  --driver=docker \
-  --cpus=2 \
-  --memory=1800mb
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=ubuntu
+Group=ubuntu
+Environment=HOME=/home/ubuntu
+
+ExecStart=/usr/local/bin/minikube start --driver=docker --cpus=2 --memory=1800mb
+ExecStop=/usr/local/bin/minikube stop
+
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable minikube.service
 
 
 # ============================================================
-# 10. VERIFICAR MINIKUBE
+# 10. INICIAR MINIKUBE
+# ============================================================
+
+echo "Iniciando Minikube mediante systemd..."
+
+systemctl start minikube.service
+
+
+# ============================================================
+# 11. VERIFICAR MINIKUBE
 # ============================================================
 
 sudo -u ubuntu -H minikube status
 
 
 # ============================================================
-# 11. OBTENER IP DE MINIKUBE
+# 12. OBTENER IP DE MINIKUBE
 # ============================================================
 
 MINIKUBE_IP=$(sudo -u ubuntu -H minikube ip)
@@ -166,23 +193,7 @@ echo "IP Minikube: ${MINIKUBE_IP}"
 
 
 # ============================================================
-# 12. CONFIGURAR NGINX COMO REVERSE PROXY
-# ============================================================
-#
-# Internet
-#    |
-#    v
-# EC2 :80
-#    |
-#    v
-# Nginx
-#    |
-#    v
-# Minikube:30080
-#    |
-#    v
-# Kubernetes Service frontend
-#
+# 13. CONFIGURAR NGINX COMO REVERSE PROXY
 # ============================================================
 
 cat > /etc/nginx/sites-available/hola-juan <<EOF
@@ -205,7 +216,7 @@ EOF
 
 
 # ============================================================
-# 13. HABILITAR CONFIGURACION NGINX
+# 14. HABILITAR CONFIGURACION NGINX
 # ============================================================
 
 ln -sf \
@@ -216,14 +227,14 @@ rm -f /etc/nginx/sites-enabled/default
 
 
 # ============================================================
-# 14. VALIDAR NGINX
+# 15. VALIDAR NGINX
 # ============================================================
 
 nginx -t
 
 
 # ============================================================
-# 15. HABILITAR E INICIAR NGINX
+# 16. HABILITAR E INICIAR NGINX
 # ============================================================
 
 systemctl enable nginx
@@ -231,7 +242,7 @@ systemctl restart nginx
 
 
 # ============================================================
-# 16. MOSTRAR VERSIONES
+# 17. MOSTRAR VERSIONES
 # ============================================================
 
 echo "============================================================"
@@ -239,13 +250,9 @@ echo "VERSIONES INSTALADAS"
 echo "============================================================"
 
 docker --version
-
 kubectl version --client
-
 minikube version
-
 aws --version
-
 nginx -v
 
 
