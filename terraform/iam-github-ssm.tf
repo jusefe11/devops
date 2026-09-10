@@ -23,7 +23,8 @@ resource "aws_iam_role_policy" "github_ssm_deploy" {
 
         Action = [
           "ssm:GetCommandInvocation",
-          "ssm:ListCommandInvocations"
+          "ssm:ListCommandInvocations",
+          "ssm:DescribeInstanceInformation"
         ]
 
         Resource = "*"
